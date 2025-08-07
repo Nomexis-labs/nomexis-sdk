@@ -10,3 +10,15 @@ export const colors = {
 
 export const brand = {
   name: "Nomexis",
+  product: "Nomexis Perpetuals",
+  network: "Canton Network",
+  shortNetwork: "Canton",
+  domain: "nomexis.xyz",
+  liveMarket: "BTC-USDC",
+  heroKicker: "Institutional-grade perpetuals on Canton",
+  description:
+    "Trade perpetual futures with live market telemetry, deep liquidity, and a professional trading interface on Canton Network.",
+  tokenName: "CC", // Canton Coin
+  tokenTicker: "CC",
+  colors,
+} as const
