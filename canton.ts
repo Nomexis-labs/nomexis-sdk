@@ -18,3 +18,23 @@ function loadConfig(): NomexisSignerConfig {
   if (!privateKey) {
     throw new Error("Nomexis_PRIVATE_KEY or Nomexis_DEPLOYER_KEY is not set")
   }
+
+  const chainId = chainIdRaw ? Number(chainIdRaw) : undefined
+  if (chainIdRaw && Number.isNaN(chainId)) {
+    throw new Error("Nomexis_CHAIN_ID must be a number")
+  }
+
+  return { rpcUrl, chainId, privateKey }
+}
+
+export function createNomexisSigner() {
+  const { rpcUrl, chainId, privateKey } = loadConfig()
+
+  const provider = new JsonRpcProvider(rpcUrl, chainId)
+  const wallet = new Wallet(privateKey, provider)
+
+  return wallet
+}
+
+export function getNomexisConfig() {
+  return loadConfig()
