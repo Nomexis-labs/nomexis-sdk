@@ -9,3 +9,13 @@ export function getWalletAddress(user: unknown) {
   }
 
   const linkedAccounts = (user as { linkedAccounts?: unknown[] | null }).linkedAccounts
+  for (const account of linkedAccounts ?? []) {
+    const address = (account as { address?: unknown } | null | undefined)?.address
+    if (typeof address === "string" && address.length > 0) {
+      return address
+    }
+  }
+
+  return undefined
+}
+
