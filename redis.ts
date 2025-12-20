@@ -140,3 +140,145 @@ function parseRESP(buffer: Buffer): ParsedResponse | null {
       }
       let rest = result.rest
       const items: unknown[] = []
+      for (let i = 0; i < count; i += 1) {
+        const parsedItem = parseRESP(rest)
+        if (!parsedItem) return null
+        items.push(parsedItem.value)
+        rest = parsedItem.rest
+      }
+      return { value: items, rest, isError: false }
+    }
+    default:
+      return null
+  }
+}
+
+function encodeCommand(args: string[]): Buffer {
+  const parts = [`*${args.length}\r\n`]
+  for (const arg of args) {
+    const byteLength = Buffer.byteLength(arg)
+    parts.push(`$${byteLength}\r\n${arg}\r\n`)
+  }
+  return Buffer.from(parts.join(""))
+}
+
+function normaliseRedisUrl(raw: string) {
+  let candidate = raw.trim()
+  if (!candidate) {
+    throw new Error("Empty Redis connection string")
+  }
+
+  if (candidate.startsWith("redis-cli")) {
+    const parts = candidate.split(/\s+/)
+    const match = parts.find((part) => part.startsWith("redis://") || part.startsWith("rediss://"))
+    if (match) {
+      candidate = match
+    }
+  }
+
+  if (!candidate.startsWith("redis://") && !candidate.startsWith("rediss://")) {
+    throw new Error(`Invalid Redis URL: ${candidate}`)
+  }
+
+  return candidate
+}
+
+function parseRedisUrl(urlStr: string) {
+  const url = new URL(normaliseRedisUrl(urlStr))
+  const host = url.hostname
+  const port = Number(url.port || (url.protocol === "rediss:" ? 6380 : 6379))
+  const password = url.password || undefined
+  const isTls = url.protocol === "rediss:"
+  return { host, port, password, isTls }
+}
+
+async function createConnection(): Promise<RedisConnection | null> {
+  const url = process.env.REDIS_URL || process.env.REDIS_CONNECTION_STRING
+  if (!url) {
+    return null
+  }
+
+  const { host, port, password, isTls } = parseRedisUrl(url)
+
+  const socket: RedisSocket = isTls
+    ? tls.connect({ host, port, rejectUnauthorized: false })
+    : net.connect({ host, port })
+
+  return await new Promise<RedisConnection | null>((resolve, reject) => {
+    const onError = (error: Error) => {
+      socket.destroy()
+      reject(error)
+    }
+
+    socket.once("error", onError)
+
+    const onConnect = async () => {
+      socket.removeListener("error", onError)
+      if (isTls) {
+        socket.removeListener("secureConnect", onConnect)
+      } else {
+        socket.removeListener("connect", onConnect)
+      }
+
+      const connection = new RedisConnection(socket)
+      if (password) {
+        try {
+          await connection.sendCommand(["AUTH", password])
+        } catch (error) {
+          socket.destroy()
+          reject(error instanceof Error ? error : new Error("Redis authentication failed"))
+          return
+        }
+      }
+      resolve(connection)
+    }
+
+    if (isTls) {
+      socket.once("secureConnect", onConnect)
+    } else {
+      socket.once("connect", onConnect)
+    }
+  })
+}
+
+async function getConnection(): Promise<RedisConnection | null> {
+  if (!connectionPromise) {
+    connectionPromise = createConnection().catch((error) => {
+      console.warn("Failed to initialise Redis", error)
+      return null
+    })
+  }
+  const connection = await connectionPromise
+
+  if (connection && !connection.isHealthy()) {
+    connectionPromise = createConnection().catch((error) => {
+      console.warn("Failed to reinitialise Redis", error)
+      return null
+    })
+    return await connectionPromise
+  }
+
+  return connection
+}
+
+export async function redisGet(key: string): Promise<string | null> {
+  const connection = await getConnection()
+  if (!connection) return null
+  const value = await connection.sendCommand(["GET", key])
+  return typeof value === "string" ? value : null
+}
+
+export async function redisSet(key: string, value: string, ttlSeconds?: number): Promise<void> {
+  const connection = await getConnection()
+  if (!connection) return
+  const args = ["SET", key, value]
+  if (ttlSeconds && ttlSeconds > 0) {
+    args.push("EX", ttlSeconds.toString())
+  }
+  await connection.sendCommand(args)
+}
+
+export async function redisDel(key: string): Promise<void> {
+  const connection = await getConnection()
+  if (!connection) return
+  await connection.sendCommand(["DEL", key])
