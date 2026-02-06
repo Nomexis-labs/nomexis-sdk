@@ -19,3 +19,5 @@ export function getWalletAddress(user: unknown) {
   return undefined
 }
 
+
+// Refactored for clarity

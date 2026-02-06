@@ -282,3 +282,4 @@ export async function redisDel(key: string): Promise<void> {
   const connection = await getConnection()
   if (!connection) return
   await connection.sendCommand(["DEL", key])
+}

@@ -38,3 +38,4 @@ export function createNomexisSigner() {
 
 export function getNomexisConfig() {
   return loadConfig()
+}
