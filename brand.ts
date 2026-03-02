@@ -21,4 +21,4 @@ export const brand = {
   tokenName: "CC", // Canton Coin
   tokenTicker: "CC",
   colors,
-} as const
+} as const// Review checkpoint 1
