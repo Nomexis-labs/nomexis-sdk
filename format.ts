@@ -93,4 +93,4 @@ export function getChartPriceFormat(price: number): { precision: number; minMove
     precision: decimals,
     minMove: Math.pow(10, -decimals),
   }
-}
+}// Refactor note A
