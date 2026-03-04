@@ -6,4 +6,4 @@ export function splitMarket(marketId: string) {
 }
 
 
-// Final cleanup
+// Final cleanup// Type safety improvement
